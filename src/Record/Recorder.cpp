@@ -80,11 +80,11 @@ std::shared_ptr<MediaSinkInterface> Recorder::createRecorder(type type, const st
 }
 
 static MediaSource::Ptr getMediaSource(const string &vhost, const string &app, const string &stream_id){
-    auto src = MediaSource::find(RTMP_SCHEMA, vhost, app, stream_id, false);
+    auto src = MediaSource::find(RTMP_SCHEMA, vhost, app, stream_id);
     if(src){
         return src;
     }
-    return MediaSource::find(RTSP_SCHEMA, vhost, app, stream_id, false);
+    return MediaSource::find(RTSP_SCHEMA, vhost, app, stream_id);
 }
 
 bool Recorder::isRecording(type type, const string &vhost, const string &app, const string &stream_id){
@@ -97,10 +97,11 @@ bool Recorder::isRecording(type type, const string &vhost, const string &app, co
 
 bool Recorder::startRecord(type type, const string &vhost, const string &app, const string &stream_id,const string &customized_path){
     auto src = getMediaSource(vhost, app, stream_id);
-    if(!src){
+    if (!src) {
+        WarnL << "未找到相关的MediaSource,startRecord失败:" << vhost << "/" << app << "/" << stream_id;
         return false;
     }
-    return src->setupRecord(type,true,customized_path);
+    return src->setupRecord(type, true, customized_path);
 }
 
 bool Recorder::stopRecord(type type, const string &vhost, const string &app, const string &stream_id){

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xiongziliang/ZLMediaKit).
@@ -109,14 +109,15 @@ int main(int argc, char *argv[]) {
             return;
         }
 
-        auto viedoTrack = strongPlayer->getTrack(TrackVideo);
+        auto viedoTrack = strongPlayer->getTrack(TrackVideo, false);
         if (!viedoTrack) {
             WarnL << "没有视频!";
             return;
         }
 
         AnyStorage::Ptr storage(new AnyStorage);
-        viedoTrack->addDelegate(std::make_shared<FrameWriterInterfaceHelper>([storage](const Frame::Ptr &frame) {
+        viedoTrack->addDelegate(std::make_shared<FrameWriterInterfaceHelper>([storage](const Frame::Ptr &frame_in) {
+            auto frame = Frame::getCacheAbleFrame(frame_in);
             SDLDisplayerHelper::Instance().doTask([frame,storage]() {
                 auto &decoder = (*storage)["decoder"];
                 auto &displayer = (*storage)["displayer"];

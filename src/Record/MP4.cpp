@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
  * This file is part of ZLMediaKit(https://github.com/xiongziliang/ZLMediaKit).
@@ -93,6 +93,7 @@ void MP4File::openFile(const char *file,const char *mode) {
 
     //创建智能指针
     _file.reset(fp,[file_buf](FILE *fp) {
+        fflush(fp);
         fclose(fp);
     });
 }

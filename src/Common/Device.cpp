@@ -12,22 +12,16 @@
 #include "Util/logger.h"
 #include "Util/base64.h"
 #include "Extension/AAC.h"
+#include "Extension/Opus.h"
 #include "Extension/G711.h"
 #include "Extension/H264.h"
 #include "Extension/H265.h"
-
 using namespace toolkit;
 
 namespace mediakit {
 
-DevChannel::DevChannel(const string &vhost,
-                       const string &app,
-                       const string &stream_id,
-                       float duration,
-                       bool enable_rtsp,
-                       bool enable_rtmp,
-                       bool enable_hls,
-                       bool enable_mp4) :
+DevChannel::DevChannel(const string &vhost, const string &app, const string &stream_id, float duration,
+                       bool enable_rtsp, bool enable_rtmp, bool enable_hls, bool enable_mp4) :
         MultiMediaSourceMuxer(vhost, app, stream_id, duration, enable_rtsp, enable_rtmp, enable_hls, enable_mp4) {}
 
 DevChannel::~DevChannel() {}
@@ -78,14 +72,6 @@ void DevChannel::inputH264(const char *data, int len, uint32_t dts, uint32_t pts
     if(pts == 0){
         pts = dts;
     }
-    int prefixeSize;
-    if (memcmp("\x00\x00\x00\x01", data, 4) == 0) {
-        prefixeSize = 4;
-    } else if (memcmp("\x00\x00\x01", data, 3) == 0) {
-        prefixeSize = 3;
-    } else {
-        prefixeSize = 0;
-    }
 
     //由于rtmp/hls/mp4需要缓存时间戳相同的帧，
     //所以使用FrameNoCacheAble类型的帧反而会在转换成FrameCacheAble时多次内存拷贝
@@ -93,9 +79,8 @@ void DevChannel::inputH264(const char *data, int len, uint32_t dts, uint32_t pts
     H264Frame::Ptr frame = std::make_shared<H264Frame>();
     frame->_dts = dts;
     frame->_pts = pts;
-    frame->_buffer.assign("\x00\x00\x00\x01",4);
-    frame->_buffer.append(data + prefixeSize, len - prefixeSize);
-    frame->_prefix_size = 4;
+    frame->_buffer.assign(data, len);
+    frame->_prefix_size = prefixSize(data,len);
     inputFrame(frame);
 }
 
@@ -106,14 +91,6 @@ void DevChannel::inputH265(const char *data, int len, uint32_t dts, uint32_t pts
     if(pts == 0){
         pts = dts;
     }
-    int prefixeSize;
-    if (memcmp("\x00\x00\x00\x01", data, 4) == 0) {
-        prefixeSize = 4;
-    } else if (memcmp("\x00\x00\x01", data, 3) == 0) {
-        prefixeSize = 3;
-    } else {
-        prefixeSize = 0;
-    }
 
     //由于rtmp/hls/mp4需要缓存时间戳相同的帧，
     //所以使用FrameNoCacheAble类型的帧反而会在转换成FrameCacheAble时多次内存拷贝
@@ -121,17 +98,17 @@ void DevChannel::inputH265(const char *data, int len, uint32_t dts, uint32_t pts
     H265Frame::Ptr frame = std::make_shared<H265Frame>();
     frame->_dts = dts;
     frame->_pts = pts;
-    frame->_buffer.assign("\x00\x00\x00\x01",4);
-    frame->_buffer.append(data + prefixeSize, len - prefixeSize);
-    frame->_prefix_size = 4;
+    frame->_buffer.assign(data, len);
+    frame->_prefix_size = prefixSize(data,len);
     inputFrame(frame);
 }
 
-class AACFrameCacheAble : public AACFrameNoCacheAble{
+class FrameAutoDelete : public FrameFromPtr{
 public:
     template <typename ... ARGS>
-    AACFrameCacheAble(ARGS && ...args) : AACFrameNoCacheAble(std::forward<ARGS>(args)...){};
-    virtual ~AACFrameCacheAble() {
+    FrameAutoDelete(ARGS && ...args) : FrameFromPtr(std::forward<ARGS>(args)...){}
+
+    ~FrameAutoDelete() override {
         delete [] _ptr;
     };
 
@@ -141,29 +118,32 @@ public:
 };
 
 void DevChannel::inputAAC(const char *data_without_adts, int len, uint32_t dts, const char *adts_header){
-    if(dts == 0){
-        dts = (uint32_t)_aTicker[1].elapsedTime();
+    if (dts == 0) {
+        dts = (uint32_t) _aTicker[1].elapsedTime();
     }
 
-    if(adts_header){
-        if(adts_header + 7 == data_without_adts){
+    if (adts_header) {
+        if (adts_header + ADTS_HEADER_LEN == data_without_adts) {
             //adts头和帧在一起
-            inputFrame(std::make_shared<AACFrameNoCacheAble>((char *)data_without_adts - 7, len + 7, dts, 0, 7));
-        }else{
+            inputFrame(std::make_shared<FrameFromPtr>(_audio->codecId, (char *) data_without_adts - ADTS_HEADER_LEN, len + ADTS_HEADER_LEN, dts, 0, ADTS_HEADER_LEN));
+        } else {
             //adts头和帧不在一起
-            char *dataWithAdts = new char[len + 7];
-            memcpy(dataWithAdts, adts_header, 7);
-            memcpy(dataWithAdts + 7 , data_without_adts , len);
-            inputFrame(std::make_shared<AACFrameCacheAble>(dataWithAdts, len + 7, dts, 0, 7));
+            char *data_with_adts = new char[len + ADTS_HEADER_LEN];
+            memcpy(data_with_adts, adts_header, ADTS_HEADER_LEN);
+            memcpy(data_with_adts + ADTS_HEADER_LEN, data_without_adts, len);
+            inputFrame(std::make_shared<FrameAutoDelete>(_audio->codecId, data_with_adts, len + ADTS_HEADER_LEN, dts, 0, ADTS_HEADER_LEN));
         }
+    } else {
+        //没有adts头
+        inputFrame(std::make_shared<FrameFromPtr>(_audio->codecId, (char *) data_without_adts, len, dts, 0, 0));
     }
 }
 
-void DevChannel::inputG711(const char *data, int len, uint32_t dts){
+void DevChannel::inputAudio(const char *data, int len, uint32_t dts){
     if (dts == 0) {
-        dts = (uint32_t)_aTicker[1].elapsedTime();
+        dts = (uint32_t) _aTicker[1].elapsedTime();
     }
-    inputFrame(std::make_shared<G711FrameNoCacheAble>(_audio->codecId, (char*)data, len, dts, 0));
+    inputFrame(std::make_shared<FrameFromPtr>(_audio->codecId, (char *) data, len, dts, 0));
 }
 
 void DevChannel::initVideo(const VideoInfo &info) {
@@ -181,6 +161,7 @@ void DevChannel::initAudio(const AudioInfo &info) {
         case CodecAAC : addTrack(std::make_shared<AACTrack>()); break;
         case CodecG711A :
         case CodecG711U : addTrack(std::make_shared<G711Track>(info.codecId, info.iSampleRate, info.iChannel, info.iSampleBit)); break;
+        case CodecOpus : addTrack(std::make_shared<OpusTrack>()); break;
         default: WarnL << "不支持该类型的音频编码类型:" << info.codecId; break;
     }
 }

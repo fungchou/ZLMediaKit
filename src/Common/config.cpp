@@ -67,6 +67,7 @@ const string kPublishToRtxp = GENERAL_FIELD"publishToRtxp";
 const string kPublishToHls = GENERAL_FIELD"publishToHls";
 const string kPublishToMP4 = GENERAL_FIELD"publishToMP4";
 const string kMergeWriteMS = GENERAL_FIELD"mergeWriteMS";
+const string kModifyStamp = GENERAL_FIELD"modifyStamp";
 
 onceToken token([](){
     mINI::Instance()[kFlowThreshold] = 1024;
@@ -79,6 +80,7 @@ onceToken token([](){
     mINI::Instance()[kPublishToHls] = 1;
     mINI::Instance()[kPublishToMP4] = 0;
     mINI::Instance()[kMergeWriteMS] = 0;
+    mINI::Instance()[kModifyStamp] = 0;
 },nullptr);
 
 }//namespace General
@@ -98,11 +100,15 @@ const string kCharSet = HTTP_FIELD"charSet";
 const string kRootPath = HTTP_FIELD"rootPath";
 //http 404错误提示内容
 const string kNotFound = HTTP_FIELD"notFound";
+//是否显示文件夹菜单
+const string kDirMenu = HTTP_FIELD"dirMenu";
 
 onceToken token([](){
     mINI::Instance()[kSendBufSize] = 64 * 1024;
     mINI::Instance()[kMaxReqSize] = 4*1024;
     mINI::Instance()[kKeepAliveSecond] = 15;
+    mINI::Instance()[kDirMenu] = true;
+
 #if defined(_WIN32)
     mINI::Instance()[kCharSet] = "gb2312";
 #else
@@ -293,3 +299,10 @@ const string kBenchmarkMode = "benchmark_mode";
 }  // namespace mediakit
 
 
+void Assert_Throw(int failed, const char *exp, const char *func, const char *file, int line){
+    if(failed) {
+        _StrPrinter printer;
+        printer << "Assertion failed: (" << exp << "), function " << func << ", file " << file << ", line " << line << ".";
+        throw std::runtime_error(printer);
+    }
+}

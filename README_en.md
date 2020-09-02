@@ -1,4 +1,4 @@
-![logo](https://raw.githubusercontent.com/zlmediakit/ZLMediaKit/master/logo.png)
+![logo](https://raw.githubusercontent.com/zlmediakit/ZLMediaKit/master/www/logo.png)
 
 # A lightweight ,high performance and stable stream server and client framework based on C++11.
 
@@ -15,20 +15,20 @@
 
 ## Features
 
-- RTSP
+- RTSP[S]
   - RTSP[S] server,support rtsp push.
-  - RTSP player and pusher.
+  - RTSP[S] player and pusher.
   - RTP Transport : `rtp over udp` `rtp over tcp` `rtp over http` `rtp udp multicast` .
   - Basic/Digest/Url Authentication.
-  - H264/H265/AAC/G711 codec.
+  - H265/H264/AAC/G711/OPUS codec.
   - Recorded as mp4.
   - Vod of mp4.
   
-- RTMP
-  - RTMP server,support player and pusher.
-  - RTMP player and pusher.
+- RTMP[S]
+  - RTMP[S] server,support player and pusher.
+  - RTMP[S] player and pusher.
   - Support HTTP-FLV player.
-  - H264/H265/AAC/G711 codec.
+  - H265/H264/AAC/G711/OPUS codec.
   - Recorded as flv or mp4.
   - Vod of mp4.
   - support [RTMP-H265](https://github.com/ksvc/FFmpeg/wiki)
@@ -36,6 +36,7 @@
 - HLS
   - RTSP RTMP can be converted into HLS,built-in HTTP server.
   - Play authentication based on cookie.
+  - Support HLS player, support streaming HLS proxy to RTSP / RTMP / MP4.
 
 - HTTP[S]
   - HTTP server,suppor directory meun、RESTful http api.
@@ -53,61 +54,7 @@
   - Play and push authentication.
   - Pull stream on Demand.
   - Support TS / PS streaming push through RTP,and it can be converted to RTSP / RTMP / HLS / FLV.
-
-
-- Protocol conversion:
-
-|          protocol/codec          | H264 | H265 | AAC  | other |
-| :------------------------------: | :--: | :--: | :--: | :---: |
-| RTSP[S] --> RTMP/HTTP[S]-FLV/FLV |  Y   |  Y   |  Y   |   N   |
-|         RTMP --> RTSP[S]         |  Y   |  Y   |  Y   |   N   |
-|         RTSP[S] --> HLS          |  Y   |  Y   |  Y   |   N   |
-|           RTMP --> HLS           |  Y   |  Y   |  Y   |   N   |
-|         RTSP[S] --> MP4          |  Y   |  Y   |  Y   |   N   |
-|           RTMP --> MP4           |  Y   |  Y   |  Y   |   N   |
-|         MP4 --> RTSP[S]          |  Y   |  Y   |  Y   |   N   |
-|           MP4 --> RTMP           |  Y   |  Y   |  Y   |   N   |
-
-- Stream generation：
-
-| feature/codec | H264 | H265 | AAC  | other |
-| :-----------: | :--: | :--: | :--: | :---: |
-| RTSP[S] push  |  Y   |  Y   |  Y   |   Y   |
-|  RTSP proxy   |  Y   |  Y   |  Y   |   Y   |
-|   RTMP push   |  Y   |  Y   |  Y   |   Y   |
-|  RTMP proxy   |  Y   |  Y   |  Y   |   Y   |
-
-- RTP transport:
-
-|  feature/transport  | tcp  | udp  | http | udp_multicast |
-| :-----------------: | :--: | :--: | :--: | :-----------: |
-| RTSP[S] Play Server |  Y   |  Y   |  Y   |       Y       |
-| RTSP[S] Push Server |  Y   |  Y   |  N   |       N       |
-|     RTSP Player     |  Y   |  Y   |  N   |       Y       |
-|     RTSP Pusher     |  Y   |  Y   |  N   |       N       |
-
-
-- Server supported:
-
-|       Server        | Y/N  |
-| :-----------------: | :--: |
-| RTSP[S] Play Server |  Y   |
-| RTSP[S] Push Server |  Y   |
-|        RTMP         |  Y   |
-| HTTP[S]/WebSocket[S] |  Y   |
-
-- Client supported:
-
-|   Client    | Y/N  |
-| :---------: | :--: |
-| RTSP Player |  Y   |
-| RTSP Pusher |  Y   |
-| RTMP Player |  Y   |
-| RTMP Pusher |  Y   |
-|   HTTP[S]   |  Y   |
-| WebSocket[S] |  Y   |
-
-
+  - Support real-time online screenshot http api.
 
 ## System Requirements
 
@@ -125,7 +72,7 @@ It is recommended to compile on Ubuntu or MacOS，compiling on windows is cumber
 ### Before build
 - **You must use git to clone the complete code. Do not download the source code by downloading zip package. Otherwise, the sub-module code will not be downloaded by default.You can do it like this:**
 ```
-git clone https://github.com/zlmediakit/ZLMediaKit.git
+git clone https://github.com/xiongziliang/ZLMediaKit.git
 cd ZLMediaKit
 git submodule update --init
 ```
@@ -187,8 +134,6 @@ git submodule update --init
   cmake .. -G Xcode -DCMAKE_TOOLCHAIN_FILE=../cmake/ios.toolchain.cmake  -DPLATFORM=OS64COMBINED
   ```
   
-
-
 
 ### Build on Android
 

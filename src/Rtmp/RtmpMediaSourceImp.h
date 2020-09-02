@@ -49,7 +49,11 @@ public:
      * 设置metadata
      */
     void setMetaData(const AMFValue &metadata) override{
-        _demuxer->loadMetaData(metadata);
+        if(!_demuxer->loadMetaData(metadata)){
+            //该metadata无效，需要重新生成
+            _metadata = metadata;
+            _recreate_metadata = true;
+        }
         RtmpMediaSource::setMetaData(metadata);
     }
 
@@ -123,7 +127,7 @@ public:
         //不重复生成rtmp
         _muxer = std::make_shared<MultiMediaSourceMuxer>(getVhost(), getApp(), getId(), _demuxer->getDuration(), enableRtsp, false, enableHls, enableMP4);
         _muxer->setMediaListener(getListener());
-        _muxer->setTrackListener(this);
+        _muxer->setTrackListener(static_pointer_cast<RtmpMediaSourceImp>(shared_from_this()));
         for(auto &track : _demuxer->getTracks(false)){
             _muxer->addTrack(track);
             track->addDelegate(_muxer);
@@ -146,11 +150,23 @@ public:
     void onAllTrackReady() override{
         setTrackSource(_muxer);
         _all_track_ready = true;
+
+        if (_recreate_metadata) {
+            //更新metadata
+            for (auto &track : _muxer->getTracks()) {
+                Metadata::addTrack(_metadata, track);
+            }
+            RtmpMediaSource::updateMetaData(_metadata);
+        }
     }
+
 private:
+    bool _all_track_ready = false;
+    bool _recreate_metadata = false;
+    AMFValue _metadata;
     RtmpDemuxer::Ptr _demuxer;
     MultiMediaSourceMuxer::Ptr _muxer;
-    bool _all_track_ready = false;
+
 };
 } /* namespace mediakit */
 

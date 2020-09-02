@@ -25,6 +25,8 @@ namespace mediakit{
 
 class MP4Muxer : public MediaSinkInterface, public MP4File{
 public:
+    typedef std::shared_ptr<MP4Muxer> Ptr;
+
     MP4Muxer(const char *file);
     ~MP4Muxer() override;
 
@@ -42,16 +44,21 @@ public:
      */
     void resetTracks() override ;
 
-private:
-    void openMP4();
+    /**
+     * 手动关闭文件(对象析构时会自动关闭)
+     */
     void closeMP4();
 
 private:
-    struct track_info{
+    void openMP4();
+    void stampSync();
+
+private:
+    struct track_info {
         int track_id = -1;
         Stamp stamp;
     };
-    unordered_map<int,track_info> _codec_to_trackid;
+    unordered_map<int, track_info> _codec_to_trackid;
     List<Frame::Ptr> _frameCached;
     bool _started = false;
     bool _have_video = false;

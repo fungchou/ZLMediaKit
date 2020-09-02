@@ -14,6 +14,7 @@
 #include "Util/File.h"
 #include "System.h"
 #include "Thread/WorkThreadPool.h"
+#include "Network/sockutil.h"
 
 namespace FFmpeg {
 #define FFmpeg_FIELD "ffmpeg."
@@ -24,19 +25,16 @@ const string kSnap = FFmpeg_FIELD"snap";
 
 onceToken token([]() {
 #ifdef _WIN32
-    string ffmpeg_bin = System::execute("where ffmpeg");
-    //windows下先关闭FFmpeg日志(目前不支持日志重定向)
-    mINI::Instance()[kCmd] = "%s -re -i %s -loglevel quiet -c:a aac -strict -2 -ar 44100 -ab 48k -c:v libx264 -f flv %s";
-    mINI::Instance()[kSnap] = "%s -i %s -loglevel quiet -y -f mjpeg -t 0.001 %s";
+    string ffmpeg_bin = trim(System::execute("where ffmpeg"));
 #else
-    string ffmpeg_bin = System::execute("which ffmpeg");
-    mINI::Instance()[kCmd] = "%s -re -i %s -c:a aac -strict -2 -ar 44100 -ab 48k -c:v libx264 -f flv %s";
-    mINI::Instance()[kSnap] = "%s -i %s -y -f mjpeg -t 0.001 %s";
+    string ffmpeg_bin = trim(System::execute("which ffmpeg"));
 #endif
     //默认ffmpeg命令路径为环境变量中路径
     mINI::Instance()[kBin] = ffmpeg_bin.empty() ? "ffmpeg" : ffmpeg_bin;
     //ffmpeg日志保存路径
     mINI::Instance()[kLog] = "./ffmpeg/ffmpeg.log";
+    mINI::Instance()[kCmd] = "%s -re -i %s -c:a aac -strict -2 -ar 44100 -ab 48k -c:v libx264 -f flv %s";
+    mINI::Instance()[kSnap] = "%s -i %s -y -f mjpeg -t 0.001 %s";
 });
 }
 
@@ -48,6 +46,18 @@ FFmpegSource::~FFmpegSource() {
     DebugL;
 }
 
+static bool is_local_ip(const string &ip){
+    if (ip == "127.0.0.1" || ip == "localhost") {
+        return true;
+    }
+    auto ips = SockUtil::getInterfaceList();
+    for (auto &obj : ips) {
+        if (ip == obj["ip"]) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void FFmpegSource::play(const string &src_url,const string &dst_url,int timeout_ms,const onPlay &cb) {
     GET_CONFIG(string,ffmpeg_bin,FFmpeg::kBin);
@@ -63,7 +73,7 @@ void FFmpegSource::play(const string &src_url,const string &dst_url,int timeout_
     _process.run(cmd,ffmpeg_log.empty() ? "" : File::absolutePath("",ffmpeg_log));
     InfoL << cmd;
 
-    if(_media_info._host == "127.0.0.1"){
+    if (is_local_ip(_media_info._host)) {
         //推流给自己的，通过判断流是否注册上来判断是否正常
         if(_media_info._schema != RTSP_SCHEMA && _media_info._schema != RTMP_SCHEMA){
             cb(SockException(Err_other,"本服务只支持rtmp/rtsp推流"));
@@ -118,8 +128,7 @@ void FFmpegSource::findAsync(int maxWaitMS, const function<void(const MediaSourc
     auto src = MediaSource::find(_media_info._schema,
                                  _media_info._vhost,
                                  _media_info._app,
-                                 _media_info._streamid,
-                                 false);
+                                 _media_info._streamid);
     if(src || !maxWaitMS){
         cb(src);
         return;
@@ -183,7 +192,7 @@ void FFmpegSource::startTimer(int timeout_ms) {
             //自身已经销毁
             return false;
         }
-        if (strongSelf->_media_info._host == "127.0.0.1") {
+        if (is_local_ip(strongSelf->_media_info._host)) {
             //推流给自己的，我们通过检查是否已经注册来判断FFmpeg是否工作正常
             strongSelf->findAsync(0, [&](const MediaSource::Ptr &src) {
                 //同步查找流
@@ -200,7 +209,19 @@ void FFmpegSource::startTimer(int timeout_ms) {
             //推流给其他服务器的，我们通过判断FFmpeg进程是否在线，如果FFmpeg推流中断，那么它应该会自动退出
             if (!strongSelf->_process.wait(false)) {
                 //ffmpeg不在线，重新拉流
-                strongSelf->play(strongSelf->_src_url, strongSelf->_dst_url, timeout_ms, [](const SockException &) {});
+                strongSelf->play(strongSelf->_src_url, strongSelf->_dst_url, timeout_ms, [weakSelf](const SockException &ex) {
+                    if(!ex){
+                        //没有错误
+                        return;
+                    }
+                    auto strongSelf = weakSelf.lock();
+                    if (!strongSelf) {
+                        //自身已经销毁
+                        return;
+                    }
+                    //上次重试时间超过10秒，那么再重试FFmpeg拉流
+                    strongSelf->startTimer(10 * 1000);
+                });
             }
         }
         return true;
@@ -232,9 +253,35 @@ int FFmpegSource::totalReaderCount(MediaSource &sender) {
     return sender.readerCount();
 }
 
+void FFmpegSource::onNoneReader(MediaSource &sender){
+    auto listener = _listener.lock();
+    if(listener){
+        listener->onNoneReader(sender);
+        return;
+    }
+    MediaSourceEvent::onNoneReader(sender);
+}
+
+void FFmpegSource::onRegist(MediaSource &sender, bool regist){
+    auto listener = _listener.lock();
+    if(listener){
+        listener->onRegist(sender, regist);
+    }
+}
+
 void FFmpegSource::onGetMediaSource(const MediaSource::Ptr &src) {
-    _listener = src->getListener();
-    src->setListener(shared_from_this());
+    auto listener = src->getListener();
+    if (listener.lock().get() != this) {
+        //防止多次进入onGetMediaSource函数导致无效递归调用的bug
+        src->setListener(shared_from_this());
+        _listener = listener;
+    } else {
+        WarnL << "多次触发onGetMediaSource事件:"
+              << src->getSchema() << "/"
+              << src->getVhost() << "/"
+              << src->getApp() << "/"
+              << src->getId();
+    }
 }
 
 void FFmpegSnap::makeSnap(const string &play_url, const string &save_path, float timeout_sec,  const function<void(bool)> &cb) {

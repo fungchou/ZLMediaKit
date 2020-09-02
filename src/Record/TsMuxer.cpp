@@ -12,6 +12,7 @@
 #if defined(ENABLE_HLS)
 #include "mpeg-ts-proto.h"
 #include "mpeg-ts.h"
+#include "Extension/H264.h"
 
 namespace mediakit {
 
@@ -21,6 +22,26 @@ TsMuxer::TsMuxer() {
 
 TsMuxer::~TsMuxer() {
     uninit();
+}
+
+void TsMuxer::stampSync(){
+    if(_codec_to_trackid.size() < 2){
+        return;
+    }
+
+    Stamp *audio = nullptr, *video = nullptr;
+    for(auto &pr : _codec_to_trackid){
+        switch (getTrackType((CodecId) pr.first)){
+            case TrackAudio : audio = &pr.second.stamp; break;
+            case TrackVideo : video = &pr.second.stamp; break;
+            default : break;
+        }
+    }
+
+    if(audio && video){
+        //音频时间戳同步于视频，因为音频时间戳被修改后不影响播放
+        audio->syncTo(*video);
+    }
 }
 
 void TsMuxer::addTrack(const Track::Ptr &track) {
@@ -52,9 +73,16 @@ void TsMuxer::addTrack(const Track::Ptr &track) {
             break;
         }
 
-        default:
+        case CodecOpus: {
+            _codec_to_trackid[track->getCodecId()].track_id = mpeg_ts_add_stream(_context, PSI_STREAM_AUDIO_OPUS, nullptr, 0);
             break;
+        }
+
+        default: WarnL << "mpeg-ts 不支持该编码格式,已忽略:" << track->getCodecName(); break;
     }
+
+    //尝试音视频同步
+    stampSync();
 }
 
 void TsMuxer::inputFrame(const Frame::Ptr &frame) {
@@ -67,8 +95,13 @@ void TsMuxer::inputFrame(const Frame::Ptr &frame) {
     int64_t dts_out, pts_out;
     _is_idr_fast_packet = !_have_video;
     switch (frame->getCodecId()){
-        case CodecH265:
         case CodecH264: {
+            int type = H264_TYPE(*((uint8_t *)frame->data() + frame->prefixSize()));
+            if(type == H264Frame::NAL_SEI){
+                break;
+            }
+        }
+        case CodecH265: {
             //这里的代码逻辑是让SPS、PPS、IDR这些时间戳相同的帧打包到一起当做一个帧处理，
             if (!_frameCached.empty() && _frameCached.back()->dts() != frame->dts()) {
                 Frame::Ptr back = _frameCached.back();
@@ -96,6 +129,14 @@ void TsMuxer::inputFrame(const Frame::Ptr &frame) {
             _frameCached.emplace_back(Frame::getCacheAbleFrame(frame));
         }
             break;
+
+        case CodecAAC: {
+            if (frame->prefixSize() == 0) {
+                WarnL << "必须提供adts头才能mpegts打包";
+                break;
+            }
+        }
+
         default: {
             track_info.stamp.revise(frame->dts(),frame->pts(),dts_out,pts_out);
             _timestamp = dts_out;

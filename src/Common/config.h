@@ -111,7 +111,7 @@ extern const string kBroadcastFlowReport;
 
 //未找到流后会广播该事件，请在监听该事件后去拉流或其他方式产生流，这样就能按需拉流了
 extern const string kBroadcastNotFoundStream;
-#define BroadcastNotFoundStreamArgs const MediaInfo &args,SockInfo &sender
+#define BroadcastNotFoundStreamArgs const MediaInfo &args,SockInfo &sender, const function<void()> &closePlayer
 
 //某个流无人消费时触发，目的为了实现无人观看时主动断开拉流等业务逻辑
 extern const string kBroadcastStreamNoneReader;
@@ -174,6 +174,8 @@ extern const string kPublishToMP4 ;
 //合并写缓存大小(单位毫秒)，合并写指服务器缓存一定的数据后才会一次性写入socket，这样能提高性能，但是会提高延时
 //开启后会同时关闭TCP_NODELAY并开启MSG_MORE
 extern const string kMergeWriteMS ;
+//全局的时间戳覆盖开关，在转协议时，对frame进行时间戳覆盖
+extern const string kModifyStamp;
 }//namespace General
 
 
@@ -191,6 +193,8 @@ extern const string kCharSet;
 extern const string kRootPath;
 //http 404错误提示内容
 extern const string kNotFound;
+//是否显示文件夹菜单
+extern const string kDirMenu;
 }//namespace Http
 
 ////////////SHELL配置///////////
@@ -217,6 +221,7 @@ extern const string kDirectProxy;
 
 ////////////RTMP服务器配置///////////
 namespace Rtmp {
+//rtmp推流时间戳覆盖开关
 extern const string kModifyStamp;
 //握手超时时间，默认15秒
 extern const string kHandshakeSecond;

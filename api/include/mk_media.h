@@ -12,6 +12,7 @@
 #define MK_MEDIA_H_
 
 #include "mk_common.h"
+#include "mk_events_objects.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,7 +54,7 @@ API_EXPORT void API_CALL mk_media_init_video(mk_media ctx, int track_id, int wid
 /**
  * 添加音频轨道
  * @param ctx 对象指针
- * @param track_id  2:CodecAAC/3:CodecG711A/4:CodecG711U
+ * @param track_id  2:CodecAAC/3:CodecG711A/4:CodecG711U/5:OPUS
  * @param channel 通道数
  * @param sample_bit 采样位数，只支持16
  * @param sample_rate 采样率
@@ -94,18 +95,27 @@ API_EXPORT void API_CALL mk_media_input_h265(mk_media ctx, void *data, int len, 
  * @param data 不包含adts头的单帧AAC数据
  * @param len 单帧AAC数据字节数
  * @param dts 时间戳，毫秒
- * @param adts adts头
+ * @param adts adts头，可以为null
  */
 API_EXPORT void API_CALL mk_media_input_aac(mk_media ctx, void *data, int len, uint32_t dts, void *adts);
 
 /**
- * 输入单帧G711音频
+ * 输入单帧PCM音频,启用ENABLE_FAAC编译时，该函数才有效
  * @param ctx 对象指针
- * @param data 单帧G711数据
- * @param len 单帧G711数据字节数
+ * @param data 单帧PCM数据
+ * @param len 单帧PCM数据字节数
  * @param dts 时间戳，毫秒
  */
-API_EXPORT void API_CALL mk_media_input_g711(mk_media ctx, void* data, int len, uint32_t dts);
+API_EXPORT void API_CALL mk_media_input_pcm(mk_media ctx, void *data, int len, uint32_t pts);
+
+/**
+ * 输入单帧OPUS/G711音频帧
+ * @param ctx 对象指针
+ * @param data 单帧音频数据
+ * @param len  单帧音频数据字节数
+ * @param dts 时间戳，毫秒
+ */
+API_EXPORT void API_CALL mk_media_input_audio(mk_media ctx, void* data, int len, uint32_t dts);
 
 /**
  * MediaSource.close()回调事件
@@ -148,6 +158,22 @@ API_EXPORT void API_CALL mk_media_set_on_seek(mk_media ctx, on_mk_media_seek cb,
  * @return 观看人数
  */
 API_EXPORT int API_CALL mk_media_total_reader_count(mk_media ctx);
+
+/**
+ * 生成的MediaSource注册或注销事件
+ * @param user_data 设置回调时的用户数据指针
+ * @param sender 生成的MediaSource对象
+ * @param regist 1为注册事件，0为注销事件
+ */
+typedef void(API_CALL *on_mk_media_source_regist)(void *user_data, mk_media_source sender, int regist);
+
+/**
+ * 设置MediaSource注册或注销事件回调函数
+ * @param ctx 对象指针
+ * @param cb 回调指针
+ * @param user_data 用户数据指针
+ */
+API_EXPORT void API_CALL mk_media_set_on_regist(mk_media ctx, on_mk_media_source_regist cb, void *user_data);
 
 #ifdef __cplusplus
 }

@@ -17,12 +17,12 @@
 
 #ifndef MediaKitApi_STATIC
 #if defined(MediaKitApi_EXPORTS)
-		#define API_EXPORT __declspec(dllexport)
-	#else
-		#define API_EXPORT __declspec(dllimport)
-	#endif
+        #define API_EXPORT __declspec(dllexport)
+    #else
+        #define API_EXPORT __declspec(dllimport)
+    #endif
 
-	#define API_CALL __cdecl
+    #define API_CALL __cdecl
 #else
 #define API_EXPORT
 #define API_CALL
@@ -100,6 +100,13 @@ API_EXPORT void API_CALL mk_env_init1(int thread_num,
  * @param val 配置项值
  */
 API_EXPORT void API_CALL mk_set_option(const char *key, const char *val);
+
+/**
+ * 获取配置项的值
+ * @param key 配置项名
+ */
+API_EXPORT const char * API_CALL mk_get_option(const char *key);
+
 
 /**
  * 创建http[s]服务器

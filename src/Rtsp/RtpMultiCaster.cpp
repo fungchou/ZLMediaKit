@@ -81,6 +81,7 @@ RtpMultiCaster::~RtpMultiCaster() {
     _pReader->setDetachCB(nullptr);
     DebugL;
 }
+
 RtpMultiCaster::RtpMultiCaster(const EventPoller::Ptr &poller,const string &strLocalIp,const string &strVhost,const string &strApp,const string &strStream) {
     auto src = dynamic_pointer_cast<RtspMediaSource>(MediaSource::find(RTSP_SCHEMA,strVhost,strApp, strStream));
     if(!src){
@@ -113,9 +114,8 @@ RtpMultiCaster::RtpMultiCaster(const EventPoller::Ptr &poller,const string &strL
         int i = 0;
         int size = pkt->size();
         pkt->for_each([&](const RtpPacket::Ptr &rtp) {
-            int i = (int) (rtp->type);
-            auto &pSock = _apUdpSock[i];
-            auto &peerAddr = _aPeerUdpAddr[i];
+            auto &pSock = _apUdpSock[rtp->type];
+            auto &peerAddr = _aPeerUdpAddr[rtp->type];
             BufferRtp::Ptr buffer(new BufferRtp(rtp, 4));
             pSock->send(buffer, nullptr, 0, ++i == size);
         });

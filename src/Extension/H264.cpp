@@ -74,6 +74,28 @@ void splitH264(const char *ptr, int len, int prefix, const std::function<void(co
     }
 }
 
+int prefixSize(const char *ptr, int len){
+    if (len < 4) {
+        return 0;
+    }
+
+    if (ptr[0] != 0x00 || ptr[1] != 0x00) {
+        //不是0x00 00开头
+        return 0;
+    }
+
+    if (ptr[2] == 0x00 && ptr[3] == 0x01) {
+        //是0x00 00 00 01
+        return 4;
+    }
+
+    if (ptr[2] == 0x01) {
+        //是0x00 00 01
+        return 3;
+    }
+    return 0;
+}
+
 #if 0
 //splitH264函数测试程序
 static onceToken s_token([](){
